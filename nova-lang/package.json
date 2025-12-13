@@ -1,0 +1,44 @@
+{
+    "name": "nova-lang",
+    "displayName": "Nova Language",
+    "description": "Language support for Nova",
+    "version": "0.0.1",
+    "publisher": "guentherKI",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/nova-lang/nova"
+    },
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "icon": "icon.png",
+    "contributes": {
+        "languages": [
+            {
+                "id": "nova",
+                "aliases": [
+                    "Nova",
+                    "nova"
+                ],
+                "extensions": [
+                    ".nova"
+                ],
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./icon.png",
+                    "dark": "./icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "nova",
+                "scopeName": "source.nova",
+                "path": "./syntaxes/nova.tmLanguage.json"
+            }
+        ]
+    }
+}
