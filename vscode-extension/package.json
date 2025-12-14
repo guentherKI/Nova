@@ -6,7 +6,7 @@
     "publisher": "guentherKI",
     "repository": {
         "type": "git",
-        "url": "https://github.com/nova-lang/nova"
+        "url": "https://github.com/guentherKI/nova"
     },
     "engines": {
         "vscode": "^1.60.0"
