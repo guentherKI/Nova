@@ -10,6 +10,7 @@ TOKENS = [
     ('RETURN', r'\breturn\b'),
     ('LET', r'\blet\b'),
     ('NEW', r'\bnew\b'),
+    ('OR', r'\bor\b'),
     ('INT_TYPE', r'\bint\b'),
     ('FLOAT_TYPE', r'\bfloat\b'),
     ('STRING_TYPE', r'\bstring\b'),
@@ -230,24 +231,34 @@ class Parser:
         self.consume('RBRACE')
         self.defined_types.add(name)
         return StructNode(name, fields)
-
-    def parse_type(self):
+    
+    def parse_single_type(self):
         t = self.consume()
-        # Accept ID as type if it's a struct (or user defined)
-        # We don't strictly check vs defined_types here to allow forward usage? 
-        # But logically: INT, FLOAT, STRING, or ID
         if t[0] not in ['INT_TYPE', 'FLOAT_TYPE', 'STRING_TYPE', 'ID']:
              raise Exception(f"Expected type but got {t}")
         base_type = t[1]
         
         if self.peek() and self.peek()[0] == 'LBRACKET':
             self.consume('LBRACKET')
-            if self.peek() and self.peek()[0] == 'RBRACKET':
-                self.consume('RBRACKET')
-                return base_type + "[]"
-            else:
-                 raise Exception("Expected ] after [ in type declaration")
+            self.consume('RBRACKET')
+            return base_type + "[]"
         return base_type
+
+    def parse_type(self):
+        # A type can be a single type or a union of types (e.g., "int or string")
+        types = [self.parse_single_type()]
+        
+        while self.peek() and self.peek()[0] == 'OR':
+            self.consume('OR')
+            types.append(self.parse_single_type())
+            
+        if len(types) > 1:
+            # We use '|' as an internal separator for our union type representation.
+            # This is hidden from the user, who only sees 'or'.
+            return "|".join(types)
+        else:
+            # It's just a single type
+            return types[0]
 
     def parse_function(self):
         self.consume('DEF')
@@ -447,6 +458,12 @@ class Parser:
 # --- Generator ---
 
 def map_type(t):
+    # Handle union types (our internal representation uses '|')
+    if "|" in t:
+        types = t.split('|')
+        mapped_types = [map_type(sub_type) for sub_type in types]
+        return f"std::variant<{', '.join(mapped_types)}>"
+
     if t == "string": return "std::string"
     if t.endswith("[]"):
         base = t[:-2]
@@ -470,6 +487,7 @@ def generate_cpp(node):
         output.append("#include <iostream>")
         output.append("#include <string>")
         output.append("#include <vector>")
+        output.append("#include <variant>")
         output.append("using namespace std;")
         output.append("")
         output.append("// Built-in helpers")
@@ -478,6 +496,19 @@ def generate_cpp(node):
         output.append("    int x;")
         output.append("    if (!(cin >> x)) { cin.clear(); cin.ignore(10000, '\\n'); return 0; }")
         output.append("    return x;")
+        output.append("}")
+        output.append("string _input_str(string prompt) {")
+        output.append("    cout << prompt;")
+        output.append("    string s;")
+        output.append("    getline(cin, s);")
+        output.append("    return s;")
+        output.append("}")
+        output.append("template<class... Ts> void _print_variant(const std::variant<Ts...>& v) {")
+        output.append("    std::visit([](const auto& val) { std::cout << val; }, v);")
+        output.append("    std::cout << std::endl;")
+        output.append("}")
+        output.append("template<typename T> void _print_simple(const T& val) {")
+        output.append("    std::cout << val << std::endl;")
         output.append("}")
         output.append("")
         output.append(f"namespace {node.name} {{")
@@ -525,8 +556,12 @@ def generate_cpp(node):
 
     elif isinstance(node, PrintNode):
         val = translate_expr(node.expr)
-        return f"cout << ({val}) << endl;"
-
+        # This is a heuristic. A proper implementation would use a symbol table
+        # to know the type of 'val'. For now, we assume if it's a simple variable
+        # name that could be a variant, we use the variant printer.
+        if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', val.strip()):
+             return f"_print_variant({val});" # Try to print as variant
+        return f"_print_simple({val});" # Print as a simple value
     elif isinstance(node, AssignmentNode):
         val = translate_expr(node.expr)
         # AssignmentNode now holds full LHS string in name
@@ -564,14 +599,21 @@ def translate_expr(expr_str):
     if "input" in expr_str:
         pattern = r'int\s*\(\s*input\s*\('
         match = re.search(pattern, expr_str)
+        # Case 1: int(input(...))
         if match:
             start_sub = "_input_int ("
             new_expr = re.sub(pattern, start_sub, expr_str, 1)
             stripped = new_expr.rstrip()
             if stripped.endswith(')'):
                 new_expr = stripped[:-1]
-            return new_expr
-            
+            return new_expr.strip()
+        
+        # Case 2: input(...)
+        pattern_str = r'input\s*\('
+        match_str = re.search(pattern_str, expr_str)
+        if match_str:
+            return re.sub(pattern_str, "_input_str(", expr_str, 1)
+
     return expr_str
 
 def main():
