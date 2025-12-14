@@ -1,8 +1,6 @@
 # Nova Language
 
-![Nova Icon](https://raw.githubusercontent.com/guentherki/nova/main/vscode-extension/icon.png)
-
-Welcome to the official repository for the Nova programming language! Nova is a modern, general-purpose language designed for clarity, performance, and ease of use.
+Welcome to the official repository for the **Nova** programming language! Nova is a modern, general-purpose language designed for clarity, performance, and ease of use.
 
 This repository contains the source code for:
 *   The **Nova Compiler** (`/compiler`)
