@@ -294,8 +294,12 @@ class Parser:
         self.consume('LET')
         type_name = self.parse_type()
         name = self.consume('ID')[1]
-        self.consume('ASSIGN')
-        expr = self.parse_expression()
+        
+        expr = None # Default to no initializer
+        if self.peek() and self.peek()[0] == 'ASSIGN':
+            self.consume('ASSIGN')
+            expr = self.parse_expression()
+
         self.consume('SEMI')
         return VarDeclNode(type_name, name, expr)
 
@@ -547,8 +551,11 @@ def generate_cpp(node):
 
     elif isinstance(node, VarDeclNode):
         cpp_type = map_type(node.type_name)
-        val = translate_expr(node.value_expr)
-        return f"{cpp_type} {node.name} = {val};"
+        if node.value_expr:
+            val = translate_expr(node.value_expr)
+            return f"{cpp_type} {node.name} = {val};"
+        else:
+            return f"{cpp_type} {node.name};"
 
     elif isinstance(node, ReturnNode):
         val = translate_expr(node.expr)
