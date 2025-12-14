@@ -1,7 +1,7 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-:: This script removes the Nova compiler directory from the user's PATH.
+:: This script removes the Nova compiler from the user's PATH and deletes the files.
 
 echo.
 echo  ==================================
@@ -9,23 +9,34 @@ echo      Nova Language Uninstaller
 echo  ==================================
 echo.
 
-:: Get the directory where this script is located.
-set "NOVA_DIR=%~dp0"
-if "%NOVA_DIR:~-1%"=="\" set "NOVA_DIR=%NOVA_DIR:~0,-1%"
+:: Define the installation directory.
+set "INSTALL_DIR=%LOCALAPPDATA%\Nova\bin"
+set "BASE_INSTALL_DIR=%LOCALAPPDATA%\Nova"
 
-echo This will remove the following directory from your user PATH:
-echo   %NOVA_DIR%
+echo This will remove the Nova compiler from your user PATH.
+echo The installation directory is:
+echo   %INSTALL_DIR%
 echo.
 
-:: Use PowerShell to safely read, filter, and set the new path.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); $newPath = ($userPath.Split(';') | Where-Object { $_ -ne '%NOVA_DIR%' }) -join ';'; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')"
+:: Use PowerShell to safely remove the directory from the PATH.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $installDir = '%INSTALL_DIR%'; $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); $newPath = ($userPath -split ';') -ne $installDir -join ';'; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'); Set-ItemProperty -Path 'Registry::HKCU\Environment' -Name 'Path' -Value $newPath; Write-Host 'Nova compiler has been removed from your PATH.'; } catch { Write-Error $_; exit 1 }"
+
+echo.
+set /p "delete_files=Do you want to delete the compiler files from %BASE_INSTALL_DIR%? (Y/N) "
+if /i "!delete_files!"=="Y" (
+    if exist "%BASE_INSTALL_DIR%" (
+        echo Deleting compiler files...
+        rmdir /s /q "%BASE_INSTALL_DIR%"
+        echo Files deleted.
+    )
+)
 
 echo.
 echo ====================================================================
-echo  SUCCESS! The Nova compiler has been removed from your user PATH.
+echo  Uninstallation complete.
 echo.
-echo  IMPORTANT: You must CLOSE and REOPEN any terminal windows
-echo  for the change to take effect.
+echo  You must CLOSE and REOPEN any open terminal windows for the
+echo  changes to fully take effect.
 echo ====================================================================
 echo.
 pause
