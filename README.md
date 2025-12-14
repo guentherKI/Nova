@@ -1,78 +1,61 @@
-# Nova Language Support for VS Code
+# Nova Language
 
+![Nova Icon](https://raw.githubusercontent.com/guentherki/nova/main/vscode-extension/icon.png)
 
-This extension provides rich language support for the [Nova programming language](https://github.com/guentherki/nova) in Visual Studio Code.
+Welcome to the official repository for the Nova programming language! Nova is a modern, general-purpose language designed for clarity, performance, and ease of use.
 
-## About Nova
+This repository contains the source code for:
+*   The **Nova Compiler** (`/compiler`)
+*   The **Visual Studio Code Extension** for syntax highlighting (`/vscode-extension`)
 
-Nova is a modern, general-purpose programming language designed for clarity and performance. This extension enables developers to write Nova code with proper syntax highlighting and editor support.
+## Getting Started with Nova
 
-## Features
+This guide will walk you through installing the compiler and writing your first program.
 
-This extension is in its early stages. Currently, it provides:
+### Step 1: Install Dependencies
 
-*   **Syntax Highlighting**: Semantic and syntactic highlighting for `.nova` files.
-*   **Language Configuration**: Basic support for comments and bracket matching.
-*   **File Icon**: A custom icon for Nova files in the explorer.
+Before you begin, ensure you have the following software installed and available in your system's PATH:
 
-### Syntax Highlighting Example
+*   **Python 3.x**
+*   **A C++ Compiler** (like `g++` from MinGW-w64 on Windows, or `clang++` on macOS/Linux)
 
-Here is a small example of what Nova code looks like with this extension enabled:
+### Step 2: Install the Nova Compiler
 
-```nova
-class ArrayTest {
-    print("--- Testing Arrays ---");
+1.  Go to the **Releases** page.
+2.  Download the latest `nova-compiler-windows.zip` file.
+3.  Extract the ZIP file to a temporary location on your computer.
+4.  Run the `install.bat` script. This will copy the compiler to a permanent location and set up your PATH.
 
-    let int[] numbers = [1, 2, 3, 4, 5];
-    
-    print("Element at index 2:");
-    print(numbers[2]); 
-    
-    numbers[2] = 99;
-    print("Element at index 2 after modification:");
-    print(numbers[2]); 
-    
-    print("Looping through array:");
-    let int i = 0;
-    while (i < 5) {
-        print(numbers[i]);
-        i = i + 1;
+> **Important**: After installation, you must **close and reopen** any open terminals (including the terminals in your IDE) for the `nova` command to be recognized.
+
+### Step 3: Write and Run Your Code
+
+1.  Create a new file named `hello.nova`.
+2.  Add the following code:
+    ```nova
+    class HelloWorld {
+        print("Hello from Nova!");
     }
-}
-```
+    ```
+3.  Open your terminal, navigate to the file's directory, and run:
+    ```sh
+    nova hello.nova
+    ```
 
+You should see the output `Hello from Nova!` in your terminal.
 
-## Installation
+## Editor Support
 
-### Marketplace (Coming Soon)
+### Visual Studio Code
 
-Once the extension is published, you will be able to install it from the Visual Studio Code Marketplace.
+An extension is available to provide rich syntax highlighting for `.nova` files.
 
-1.  Open **VS Code**.
-2.  Go to the **Extensions** view (`Ctrl+Shift+X`).
-3.  Search for `Nova Language`.
-4.  Click **Install**.
-
-### Manual Installation
-
-You can also install the extension manually from a `.vsix` package.
-
-1.  Download the latest release `.vsix` file from the releases page.
-2.  Open **VS Code**.
-3.  Go to the **Extensions** view (`Ctrl+Shift+X`).
-4.  Click the `...` menu in the top-right corner and select **Install from VSIX...**.
-5.  Choose the `.vsix` file you downloaded.
+For installation instructions, please see the VS Code Extension README.
 
 ## Contributing
 
-Contributions are welcome! If you'd like to help improve the Nova language support, please feel free to fork the repository, make your changes, and submit a pull request.
-
-## Repository
-
-The source code for this extension and the Nova language itself is hosted on GitHub. For more details on the Nova language, please see the main repository.
-
-*   **Language & Compiler:** [(https://github.com/guentherki/nova)]
+Contributions are welcome! If you'd like to help improve the Nova language or its tools, please feel free to fork the repository, make your changes, and submit a pull request.
 
 ---
 
-*Published by the guentherKI.
+*Published by guentherKI.*
