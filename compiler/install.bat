@@ -34,9 +34,19 @@ if not exist "%INSTALL_DIR%" (
 )
 
 echo Copying compiler files...
-copy /Y "%SOURCE_DIR%compiler.py" "%INSTALL_DIR%" > nul
-copy /Y "%SOURCE_DIR%nova.bat" "%INSTALL_DIR%" > nul
+copy /Y "%SOURCE_DIR%compiler.py" "%INSTALL_DIR%"
+copy /Y "%SOURCE_DIR%nova.bat" "%INSTALL_DIR%"
 echo.
+
+echo Configuring compiler path...
+:: PowerShell command to replace the placeholder in the copied nova.bat
+powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Content '%INSTALL_DIR%\nova.bat') -replace '__INSTALL_DIR__', '%INSTALL_DIR%\\' | Set-Content '%INSTALL_DIR%\nova.bat'"
+if errorlevel 1 (
+    echo ERROR: Failed to configure the compiler path in nova.bat.
+    pause
+    exit /b 1
+)
+echo Configuration successful.
 
 :: Use PowerShell to add the new, stable path to the user's PATH variable if it's not already there.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $installDir = '%INSTALL_DIR%'; $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not ($userPath -split ';').Contains($installDir)) { $newPath = ($userPath, $installDir) -join ';'; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'); Set-ItemProperty -Path 'Registry::HKCU\Environment' -Name 'Path' -Value $newPath; Write-Host 'SUCCESS: Nova compiler has been installed and added to your PATH.'; } else { Write-Host 'INFO: Nova compiler is already in your PATH.'; } } catch { Write-Error $_; exit 1 }"

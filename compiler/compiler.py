@@ -470,9 +470,6 @@ def generate_cpp(node):
         output.append("#include <iostream>")
         output.append("#include <string>")
         output.append("#include <vector>")
-        output.append("#include <iomanip>")
-        output.append("#include <windows.h>")
-        output.append("#include <conio.h>")
         output.append("using namespace std;")
         output.append("")
         output.append("// Built-in helpers")
@@ -482,35 +479,6 @@ def generate_cpp(node):
         output.append("    if (!(cin >> x)) { cin.clear(); cin.ignore(10000, '\\n'); return 0; }")
         output.append("    return x;")
         output.append("}")
-        output.append("")
-        output.append("// Game Helpers")
-        output.append("void screen_clear() {")
-        output.append("    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);")
-        output.append("    COORD Position; Position.X = 0; Position.Y = 0;")
-        output.append("    SetConsoleCursorPosition(hOut, Position);")
-        output.append("    // Simple hack: don't actually clear, just overwrite? Or system cls.")
-        output.append("    // For performance in game loop, standard is double buffer, but for simple Nova:")
-        output.append("    system(\"cls\");") 
-        output.append("}")
-        output.append("void screen_draw(int x, int y, string s) {")
-        output.append("    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);")
-        output.append("    COORD Position; Position.X = (SHORT)x; Position.Y = (SHORT)y;")
-        output.append("    SetConsoleCursorPosition(hOut, Position);")
-        output.append("    cout << s;")
-        output.append("}")
-        output.append("int key_down(string key) {")
-        output.append("    // Check basic keys. key='w', 'a', etc.")
-        output.append("    if (key.length() == 0) return 0;")
-        output.append("    char k = key[0];")
-        output.append("    // Windows limits: GetAsyncKeyState uses Virtual Key codes.")
-        output.append("    // Map simple chars to VK.")
-        output.append("    int vk = 0;")
-        output.append("    if (k >= 'a' && k <= 'z') vk = 0x41 + (k - 'a');")
-        output.append("    else if (k >= 'A' && k <= 'Z') vk = 0x41 + (k - 'A');")
-        output.append("    else if (k == ' ') vk = VK_SPACE;")
-        output.append("    return (GetAsyncKeyState(vk) & 0x8000) ? 1 : 0;")
-        output.append("}")
-        output.append("void delay(int ms) { Sleep(ms); }")
         output.append("")
         output.append(f"namespace {node.name} {{")
         
@@ -604,68 +572,30 @@ def translate_expr(expr_str):
                 new_expr = stripped[:-1]
             return new_expr
             
-    # Game Helpers Mapping
-    # We just ensure they are called correctly. Since they are global in C++,
-    # and we are in a namespace, we should probably prefix with :: if conflicts arise.
-    # But C++ lookup usually finds global if not shadowed.
-    # However, let's just make sure input args are preserved.
-    # No special translation needed if names match C++ exactly.
-    # screen_clear, screen_draw, key_down, delay.
-    
     return expr_str
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python compiler.py <file> [--run]")
-        return
+    if len(sys.argv) != 2:
+        print("Usage: python compiler.py <file>", file=sys.stderr)
+        sys.exit(1)
 
     filepath = sys.argv[1]
-    
-    # Check options
-    should_run = False
-    if len(sys.argv) > 2 and sys.argv[2] == "--run":
-        should_run = True
         
     if not os.path.exists(filepath):
-        print(f"Error: File '{filepath}' not found.")
-        return
+        print(f"Error: File '{filepath}' not found.", file=sys.stderr)
+        sys.exit(1)
 
-    with open(filepath, 'r') as f:
-        code = f.read()
-
-    tokens = lex(code)
-    parser = Parser(tokens)
     try:
+        with open(filepath, 'r') as f:
+            code = f.read()
+        tokens = lex(code)
+        parser = Parser(tokens)
         ast = parser.parse()
+        cpp_code = generate_cpp(ast)
+        print(cpp_code)
     except Exception as e:
-        print(f"Compilation Error: {e}")
-        return
-        
-    cpp_code = generate_cpp(ast)
-    
-    # Determine output names avoiding double extensions
-    base_name = os.path.splitext(filepath)[0]
-    cpp_path = base_name + ".cpp"
-    exe_path = base_name + ".exe"
-    
-    with open(cpp_path, 'w') as f:
-        f.write(cpp_code)
-         
-    # Compile
-    # Try clang++ first as per environment
-    compile_cmd = f"clang++ -static {cpp_path} -o {exe_path}"
-    if os.system(compile_cmd) != 0:
-        # Fallback to g++
-        compile_cmd = f"g++ -static {cpp_path} -o {exe_path}"
-        if os.system(compile_cmd) != 0:
-            print("Compilation Failed (tried clang++ and g++).")
-            return
-            
-    print(f"Successfully compiled to {exe_path}")
-    
-    if should_run:
-        print("--- Running ---")
-        os.system(exe_path)
+        print(f"Compilation Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
