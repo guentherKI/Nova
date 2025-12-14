@@ -422,6 +422,9 @@ class Parser:
             txt = tok[1]
             type_ = tok[0]
             to_append = txt
+
+            if type_ == 'FLOAT':
+                to_append = txt + 'f'
             
             if type_ == 'LPAREN':
                 balance += 1
