@@ -11,6 +11,8 @@ TOKENS = [
     ('LET', r'\blet\b'),
     ('NEW', r'\bnew\b'),
     ('OR', r'\bor\b'),
+    ('MATCH', r'\bmatch\b'),
+    ('IS', r'\bis\b'),
     ('INT_TYPE', r'\bint\b'),
     ('FLOAT_TYPE', r'\bfloat\b'),
     ('STRING_TYPE', r'\bstring\b'),
@@ -126,6 +128,17 @@ class ExpressionNode(Node):
     def __init__(self, text):
         self.text = text
 
+class MatchNode(Node):
+    def __init__(self, expr, cases):
+        self.expr = expr
+        self.cases = cases # List of MatchCaseNode
+
+class MatchCaseNode(Node):
+    def __init__(self, types, var_name, body):
+        self.types = types # This is a string, e.g., "int" or "int|float"
+        self.var_name = var_name
+        self.body = body
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -180,6 +193,8 @@ class Parser:
             return self.parse_if()
         elif token[0] == 'WHILE':
             return self.parse_while()
+        elif token[0] == 'MATCH':
+            return self.parse_match()
         elif token[0] == 'ID':
             # Assignment check: ID = ... or ID.field = ... or ID[idx] = ...
             if self.is_assignment_start():
@@ -285,11 +300,10 @@ class Parser:
         
         self.consume('LBRACE')
         body = []
-        while self.peek()[0] != 'RBRACE':
+        while self.peek() and self.peek()[0] != 'RBRACE':
             body.append(self.parse_statement())
         self.consume('RBRACE')
         return FunctionNode(name, args, ret_type, body)
-
     def parse_var_decl(self):
         self.consume('LET')
         type_name = self.parse_type()
@@ -322,20 +336,16 @@ class Parser:
         self.consume('LPAREN')
         condition = self.parse_expression()
         self.consume('RPAREN')
-        self.consume('LBRACE')
-        if_body = []
-        while self.peek()[0] != 'RBRACE':
-            if_body.append(self.parse_statement())
-        self.consume('RBRACE')
+        if_body = self.parse_block()
         
         else_body = None
         if self.peek() and self.peek()[0] == 'ELSE':
             self.consume('ELSE')
-            self.consume('LBRACE')
-            else_body = []
-            while self.peek()[0] != 'RBRACE':
-                else_body.append(self.parse_statement())
-            self.consume('RBRACE')
+            if self.peek() and self.peek()[0] == 'IF':
+                # else if
+                else_body = [self.parse_if()]
+            else:
+                else_body = self.parse_block()
             
         return IfNode(condition, if_body, else_body)
 
@@ -344,12 +354,39 @@ class Parser:
         self.consume('LPAREN')
         condition = self.parse_expression()
         self.consume('RPAREN')
+        body = self.parse_block()
+        return WhileNode(condition, body)
+
+    def parse_block(self):
         self.consume('LBRACE')
         body = []
-        while self.peek()[0] != 'RBRACE':
+        while self.peek() and self.peek()[0] != 'RBRACE':
             body.append(self.parse_statement())
         self.consume('RBRACE')
-        return WhileNode(condition, body)
+        return body
+
+    def parse_match(self):
+        self.consume('MATCH')
+        self.consume('LPAREN')
+        expr = self.parse_expression()
+        self.consume('RPAREN')
+        self.consume('LBRACE')
+        
+        cases = []
+        while self.peek() and self.peek()[0] != 'RBRACE':
+            cases.append(self.parse_match_case())
+            
+        self.consume('RBRACE')
+        return MatchNode(expr, cases)
+
+    def parse_match_case(self):
+        self.consume('IS')
+        # parse_type() already handles single types and `or`-separated types
+        type_name = self.parse_type() 
+        var_name = self.consume('ID')[1]
+        self.consume('COLON')
+        body = self.parse_block()
+        return MatchCaseNode(type_name, var_name, body)
 
     def parse_assignment(self):
         # This handles `x = ...`, `x.y = ...`, `x[i] = ...`
@@ -601,6 +638,29 @@ def generate_cpp(node):
             out += "        " + generate_cpp(stmt) + "\n"
         out += "    }"
         return out
+
+    elif isinstance(node, MatchNode):
+        expr = translate_expr(node.expr)
+        # We generate a C++ lambda for std::visit
+        out = f"std::visit([](auto&& arg) {{\n"
+        out += f"    using T = std::decay_t<decltype(arg)>;\n"
+
+        for i, case in enumerate(node.cases):
+            # case.types is a string like "int|float" or just "int"
+            types = case.types.split('|')
+            conditions = [f"std::is_same_v<T, {map_type(t)}>" for t in types]
+            
+            if_or_else_if = "if" if i == 0 else " else if"
+
+            out += f"    {if_or_else_if} constexpr ({' || '.join(conditions)}) {{\n"
+            # The new variable inside the case block gets the value of 'arg'
+            out += f"        auto {case.var_name} = arg;\n"
+            for stmt in case.body:
+                out += "        " + generate_cpp(stmt) + "\n"
+            out += "    }"
+        
+        out += f"\n}}, {expr});"
+        return out
     
     return ""
 
@@ -623,6 +683,9 @@ def translate_expr(expr_str):
         match_str = re.search(pattern_str, expr_str)
         if match_str:
             return re.sub(pattern_str, "_input_str(", expr_str, 1)
+
+    # Handle string() type casting
+    expr_str = re.sub(r'\bstring\s*\((.*?)\)', r'std::to_string(\1)', expr_str)
 
     return expr_str
 
