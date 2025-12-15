@@ -76,6 +76,11 @@ def lex(code):
 class Node:
     pass
 
+class ProgramNode(Node):
+    def __init__(self, name, body):
+        self.name = name # Module name from filename
+        self.body = body
+
 class ClassNode(Node):
     def __init__(self, name, body):
         self.name = name
@@ -139,6 +144,10 @@ class MatchCaseNode(Node):
         self.var_name = var_name
         self.body = body
 
+class MatchDefaultCaseNode(Node):
+    def __init__(self, body):
+        self.body = body
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -165,9 +174,15 @@ class Parser:
         raise Exception("Unexpected end of input")
         
     def parse(self):
-        return self.parse_class()
+        # A program is a sequence of top-level statements.
+        body = []
+        while self.peek():
+            body.append(self.parse_statement())
+        # We'll wrap this in a ProgramNode later in the main function
+        return body
 
     def parse_class(self):
+        # This is now just for parsing a class definition, not the whole file.
         self.consume('CLASS')
         name = self.consume('ID')[1]
         self.consume('LBRACE')
@@ -183,6 +198,8 @@ class Parser:
             return self.parse_function()
         elif token[0] == 'STRUCT':
             return self.parse_struct_def()
+        elif token[0] == 'CLASS':
+            return self.parse_class()
         elif token[0] == 'LET':
             return self.parse_var_decl()
         elif token[0] == 'RETURN':
@@ -252,7 +269,7 @@ class Parser:
         if t[0] not in ['INT_TYPE', 'FLOAT_TYPE', 'STRING_TYPE', 'ID']:
              raise Exception(f"Expected type but got {t}")
         base_type = t[1]
-        
+
         if self.peek() and self.peek()[0] == 'LBRACKET':
             self.consume('LBRACKET')
             self.consume('RBRACKET')
@@ -374,7 +391,11 @@ class Parser:
         
         cases = []
         while self.peek() and self.peek()[0] != 'RBRACE':
-            cases.append(self.parse_match_case())
+            if self.peek()[0] == 'IS':
+                cases.append(self.parse_match_case())
+            elif self.peek()[0] == 'ELSE':
+                cases.append(self.parse_match_default_case())
+                break # else must be the last case
             
         self.consume('RBRACE')
         return MatchNode(expr, cases)
@@ -387,6 +408,12 @@ class Parser:
         self.consume('COLON')
         body = self.parse_block()
         return MatchCaseNode(type_name, var_name, body)
+
+    def parse_match_default_case(self):
+        self.consume('ELSE')
+        self.consume('COLON')
+        body = self.parse_block()
+        return MatchDefaultCaseNode(body)
 
     def parse_assignment(self):
         # This handles `x = ...`, `x.y = ...`, `x[i] = ...`
@@ -510,20 +537,23 @@ def map_type(t):
 
     if t == "string": return "std::string"
     if t.endswith("[]"):
-        base = t[:-2]
+        base = t.replace("[]", "")
         return f"std::vector<{map_type(base)}>"
     return t # Assumed ID is a valid C++ struct name
 
 def generate_cpp(node):
-    if isinstance(node, ClassNode):
+    if isinstance(node, ProgramNode):
         structs = []
         functions = []
+        classes = []
         main_stmts = []
         for item in node.body:
             if isinstance(item, StructNode):
                 structs.append(item)
             elif isinstance(item, FunctionNode):
                 functions.append(item)
+            elif isinstance(item, ClassNode):
+                classes.append(item)
             else:
                 main_stmts.append(item)
         
@@ -564,6 +594,10 @@ def generate_cpp(node):
                  output.append(f"        {map_type(f_type)} {f_name};")
              output.append("    };")
              output.append("")
+        
+        # Classes (currently treated like namespaces with functions)
+        for c in classes:
+            output.append(generate_cpp(c))
 
         for func in functions:
             output.append(generate_cpp(func))
@@ -579,6 +613,23 @@ def generate_cpp(node):
         output.append("    return 0;")
         output.append("}")
         return "\n".join(output)
+
+    elif isinstance(node, ClassNode):
+        # Generate a namespace for the class
+        out = [f"    namespace {node.name} {{"]
+        
+        structs = []
+        functions = []
+        for item in node.body:
+            if isinstance(item, FunctionNode):
+                functions.append(item)
+            # Other node types inside class can be added here
+
+        for func in functions:
+            out.append(generate_cpp(func))
+
+        out.append("    }")
+        return "\n".join(out)
 
     elif isinstance(node, FunctionNode):
         ret_type = "void" if node.ret_type == "void" else map_type(node.ret_type)
@@ -646,18 +697,28 @@ def generate_cpp(node):
         out += f"    using T = std::decay_t<decltype(arg)>;\n"
 
         for i, case in enumerate(node.cases):
-            # case.types is a string like "int|float" or just "int"
-            types = case.types.split('|')
-            conditions = [f"std::is_same_v<T, {map_type(t)}>" for t in types]
-            
-            if_or_else_if = "if" if i == 0 else " else if"
+            if isinstance(case, MatchDefaultCaseNode):
+                out += "    else {\n"
+                for stmt in case.body:
+                    out += "        " + generate_cpp(stmt) + "\n"
+                out += "    }"
+            elif isinstance(case, MatchCaseNode):
+                types = case.types.split('|')
+                conditions = [f"std::is_same_v<T, {map_type(t)}>" for t in types]
+                
+                if_or_else_if = "if" if i == 0 else " else if"
 
-            out += f"    {if_or_else_if} constexpr ({' || '.join(conditions)}) {{\n"
-            # The new variable inside the case block gets the value of 'arg'
-            out += f"        auto {case.var_name} = arg;\n"
-            for stmt in case.body:
-                out += "        " + generate_cpp(stmt) + "\n"
-            out += "    }"
+                out += f"    {if_or_else_if} constexpr ({' || '.join(conditions)}) {{\n"
+                
+                # Promote int to float for combined 'int or float' cases
+                has_int = 'int' in types
+                has_float = 'float' in types
+                var_type = "float" if has_int and has_float else "auto"
+
+                out += f"        {var_type} {case.var_name} = arg;\n"
+                for stmt in case.body:
+                    out += "        " + generate_cpp(stmt) + "\n"
+                out += "    }"
         
         out += f"\n}}, {expr});"
         return out
@@ -700,13 +761,19 @@ def main():
         print(f"Error: File '{filepath}' not found.", file=sys.stderr)
         sys.exit(1)
 
+    # Get module name from filename
+    module_name = os.path.splitext(os.path.basename(filepath))[0]
+    # Sanitize module name for C++
+    module_name = re.sub(r'[^a-zA-Z0-9_]', '_', module_name)
+
     try:
         with open(filepath, 'r') as f:
             code = f.read()
         tokens = lex(code)
         parser = Parser(tokens)
-        ast = parser.parse()
-        cpp_code = generate_cpp(ast)
+        statements = parser.parse()
+        program_ast = ProgramNode(module_name, statements)
+        cpp_code = generate_cpp(program_ast)
         print(cpp_code)
     except Exception as e:
         print(f"Compilation Error: {e}", file=sys.stderr)

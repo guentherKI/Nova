@@ -58,7 +58,6 @@
             "patterns": [
                 {
                     "name": "keyword.control.nova",
-                    "match": "\\b(if|else|while|return|class|struct|new)\\b"
                     "match": "\\b(if|else|while|return|class|struct|new|match|is)\\b"
                 },
                 {
@@ -71,7 +70,6 @@
                 },
                 {
                     "name": "storage.type.primitive.nova",
-                    "match": "\\b(int|float|string|void)\\b"
                     "match": "\\b(int|float|string|void|or)\\b"
                 }
             ]
@@ -102,13 +100,13 @@
             "patterns": [
                 {
                     "name": "meta.variable.declaration.nova",
-                    "match": "\\b(let)\\s+([a-zA-Z0-9_\\[\\]]+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+                    "match": "\\b(let)\\s+([a-zA-Z_][a-zA-Z0-9_]*(\\[\\])?(?:\\s+or\\s+[a-zA-Z_][a-zA-Z0-9_]*(\\[\\])?)*)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
                     "captures": {
                         "1": {
                             "name": "storage.type.nova"
                         },
                         "2": {
-                            "name": "entity.name.type.nova"
+                            "name": "entity.name.type.nova" 
                         },
                         "3": {
                             "name": "variable.name.nova"
@@ -129,19 +127,19 @@
                 },
                 {
                     "name": "meta.function.parameter.nova",
-                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z0-9_\\[\\]]+)",
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z_][a-zA-Z0-9_]*(\\[\\])?)",
                     "captures": {
                         "1": {
                             "name": "variable.parameter.nova"
                         },
                         "2": {
-                            "name": "entity.name.type.nova"
+                            "name": "entity.name.type.nova" 
                         }
                     }
                 },
                 {
                     "name": "meta.field.declaration.nova",
-                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z0-9_\\[\\]]+)",
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z_][a-zA-Z0-9_]*(\\[\\])?)",
                     "captures": {
                         "1": {
                             "name": "variable.object.property.nova"
