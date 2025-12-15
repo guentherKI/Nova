@@ -59,6 +59,7 @@
                 {
                     "name": "keyword.control.nova",
                     "match": "\\b(if|else|while|return|class|struct|new)\\b"
+                    "match": "\\b(if|else|while|return|class|struct|new|match|is)\\b"
                 },
                 {
                     "name": "storage.type.nova",
@@ -71,6 +72,7 @@
                 {
                     "name": "storage.type.primitive.nova",
                     "match": "\\b(int|float|string|void)\\b"
+                    "match": "\\b(int|float|string|void|or)\\b"
                 }
             ]
         },
